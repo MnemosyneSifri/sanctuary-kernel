@@ -1,0 +1,147 @@
+import React, { useState, useRef, useEffect } from 'react';
+import { v4 as uuidv4 } from 'uuid';
+import { Tooltip } from 'react-tooltip';
+
+interface Offering {
+  id: string;
+  text: string;
+  timestamp: number;
+}
+
+const SanctuaryKernelFrontend: React.FC = () => {
+  const [offerings, setOfferings] = useState<Offering[]>([]);
+  const [inputValue, setInputValue] = useState('');
+  const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'light');
+  const [soundOn, setSoundOn] = useState(() => localStorage.getItem('sound') !== 'false');
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    localStorage.setItem('theme', theme);
+    localStorage.setItem('sound', soundOn.toString());
+    document.documentElement.setAttribute('data-theme', theme);
+  }, [theme, soundOn]);
+
+  const playSound = () => {
+    if (soundOn) {
+      const audio = new Audio('/sounds/chime.mp3');
+      audio.play();
+    }
+  };
+
+  const handleSubmit = () => {
+    if (!inputValue.trim()) return;
+    const newOffering: Offering = {
+      id: uuidv4(),
+      text: inputValue.trim(),
+      timestamp: Date.now(),
+    };
+    setOfferings((prev) => [...prev, newOffering]);
+    setInputValue('');
+    inputRef.current?.focus();
+    playSound();
+  };
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const now = Date.now();
+      setOfferings((prev) => prev.filter(o => now - o.timestamp < 12000));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const cycleTheme = () => {
+    setTheme((prev) => prev === 'light' ? 'dark' : prev === 'dark' ? 'twilight' : 'light');
+  };
+
+  const getGlyph = (theme: string) => {
+    switch (theme) {
+      case 'light': return '🜃';
+      case 'twilight': return '✿';
+      case 'dark': return '•';
+      default: return '🜃';
+    }
+  };
+
+  return (
+    <main className="min-h-screen p-6 font-serif" style={{ backgroundColor: 'var(--bg-color)', color: 'var(--text-color)' }}>
+      <header className="text-center mb-6">
+        <h1 className="text-3xl font-bold flex items-center justify-center gap-2">
+          <span role="img" aria-label="Sanctuary Glyph" style={{ color: 'var(--glyph-color)' }}>{getGlyph(theme)}</span> Sanctuary Kernel
+        </h1>
+        <p className="mt-2 italic" style={{ color: 'var(--accent-color)' }}>
+          "Privacy as Presence Dissolved"
+        </p>
+      </header>
+
+      <section className="max-w-xl mx-auto p-4 rounded-2xl shadow-md" style={{ backgroundColor: 'var(--card-bg)' }}>
+        <textarea
+          ref={inputRef}
+          value={inputValue}
+          onChange={(e) => setInputValue(e.target.value)}
+          placeholder="Whisper your ephemeral reflection..."
+          className="w-full p-3 border rounded-md focus:outline-none focus:ring-2"
+          style={{ borderColor: 'var(--border-color)' }}
+          rows={4}
+        />
+        <div className="mt-3 flex gap-2">
+          <button onClick={handleSubmit} className="text-white px-4 py-2 rounded-lg transition" style={{ backgroundColor: 'var(--accent-color)' }}>
+            Offer
+          </button>
+          <button onClick={cycleTheme} className="text-white px-4 py-2 rounded-lg transition" style={{ backgroundColor: 'var(--accent-color)' }}>
+            Cycle Sanctuary Light
+          </button>
+          <button onClick={() => setSoundOn((prev) => !prev)} className="text-sm px-4 py-2 rounded-lg transition" style={{ color: 'var(--text-color)' }}>
+            {soundOn ? '🔈 Sound On' : '🔇 Sound Off'}
+          </button>
+        </div>
+
+        <div className="mt-6 space-y-2" aria-live="polite">
+          {offerings.length === 0 && <p className="text-slate-500 italic">Your reflections appear here, then gently fade...</p>}
+          {offerings.map((offering) => {
+            const age = Date.now() - offering.timestamp;
+            const opacity = 1 - age / 12000;
+            return (
+              <div key={offering.id} style={{ opacity }} className="transition-opacity duration-1000 p-3 rounded-md shadow-sm">
+                {offering.text}
+              </div>
+            );
+          })}
+        </div>
+
+        <svg className="mt-4 w-full h-24" role="region" aria-label="Ephemeral Offerings Timeline">
+          <line x1="0" y1="12" x2="100%" y2="12" stroke="var(--border-color)" strokeWidth="2" />
+          {offerings.map((offering, index) => {
+            const age = Date.now() - offering.timestamp;
+            const opacity = 1 - age / 12000;
+            const x = (index * 50) % 600;
+            return (
+              <g key={offering.id} style={{ opacity, transition: 'opacity 1s' }}>
+                <text
+                  x={x}
+                  y="12"
+                  fontSize="16"
+                  fill="var(--glyph-color)"
+                  textAnchor="middle"
+                  data-tooltip-id={`tooltip-${offering.id}`}
+                  data-tooltip-content={offering.text}
+                  style={{
+                    transform: `translateY(${Math.sin(age / 500) * 4}px)`,
+                    transition: 'transform 0.5s ease-in-out',
+                  }}
+                >
+                  {getGlyph(theme)}
+                </text>
+                <Tooltip id={`tooltip-${offering.id}`} place="top" />
+                <text x={x} y="30" fontSize="10" fill="var(--text-color)" textAnchor="middle">
+                  {new Date(offering.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                </text>
+              </g>
+            );
+          })}
+        </svg>
+      </section>
+    </main>
+  );
+};
+
+export default SanctuaryKernelFrontend;
